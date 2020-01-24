@@ -34,7 +34,12 @@ module Capistrano
               threads = run_in_threads(chunk)
               all_threads << threads
               wait_for(threads)
-              rollback_all_threads(all_threads.flatten) and return if threads.any? {|t| t[:rolled_back] || t[:exception_raised]}
+              if threads.any? {|t| t[:rolled_back] || t[:exception_raised]}
+                rollback_all_threads(all_threads.flatten)
+                logger.debug "ERROR : Subthread failed in parallel running with following exception : \n"
+                threads.map {|t| logger.debug t.value}
+                raise
+              end
               batch += 1
             end
             all_threads
