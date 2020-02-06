@@ -6,22 +6,22 @@ module Capistrano
 
           class BlockProxy
             attr_accessor :blocks
-        
+
             def initialize
               @blocks = []
             end
-        
+
             def run(&block)
               blocks << block
             end
           end
-      
+
           def parallelize(thread_count = nil)
             set :parallelize_thread_count, 10 unless respond_to?(:parallelize_thread_count)
-        
+
             proxy = BlockProxy.new
             yield proxy
-        
+
             logger.info "Running #{proxy.blocks.size} threads in chunks of #{thread_count || parallelize_thread_count}"
             run_parallelize_loop(proxy, thread_count || parallelize_thread_count)
           end
@@ -35,16 +35,16 @@ module Capistrano
               all_threads << threads
               wait_for(threads)
               if threads.any? {|t| t[:rolled_back] || t[:exception_raised]}
-                rollback_all_threads(all_threads.flatten)
-                logger.debug "ERROR : Subthread failed in parallel running with following exception : \n"
-                threads.map {|t| logger.debug t.value}
-                raise
+                error_threads = threads.select {|t| t[:rolled_back] || t[:exception_raised]}
+                rollback_all_threads(error_threads.flatten)
+                logger.debug "ERROR : Subthread failed in parallel running with above exception(s)"
+                abort
               end
               batch += 1
             end
             all_threads
           end
-      
+
           def run_in_threads(blocks)
             blocks.collect do |blk|
               thread = Thread.new do
@@ -59,18 +59,22 @@ module Capistrano
               thread
             end
           end
-      
+
           def wait_for(threads)
             threads.each do |thread|
               begin
                 thread.join
               rescue
+                logger.important "---------------------------------------------------------------------------------------------------------------------------------------"
                 logger.important "Subthread failed: #{$!.message}"
+                logger.important "Errortrace : "
+                logger.important $!.backtrace.join("\n")
+                logger.important "---------------------------------------------------------------------------------------------------------------------------------------"
                 thread[:exception_raised] = $!
               end
             end
           end
- 
+
           def rollback_all_threads(threads)
             Thread.new do
               threads.select {|t| !t[:rolled_back]}.each do |thread|
@@ -81,7 +85,7 @@ module Capistrano
             rollback! # Rolling back main thread too
             true
           end
-      
+
         end
       end
     end
