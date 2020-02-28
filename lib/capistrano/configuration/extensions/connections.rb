@@ -32,8 +32,12 @@ module Capistrano
     
         def teardown_connections_to(servers)
           servers.each do |server|
-            sessions[server].close
-            sessions.delete(server)
+            begin
+              session = sessions.delete(server)
+              session.close if session
+            rescue IOError, Net::SSH::Disconnect
+              # the TCP connection is already dead
+            end
           end
         end
     
