@@ -37,7 +37,7 @@ module Capistrano
               if threads.any? {|t| t[:rolled_back] || t[:exception_raised]}
                 error_threads = threads.select {|t| t[:rolled_back] || t[:exception_raised]}
                 rollback_all_threads(error_threads.flatten)
-                logger.debug "ERROR : Subthread failed in parallel running with above exception(s)"
+                logger.debug "ERROR : Subthread #{error_threads} failed in parallel running with #{t[:exception_raised]} exception(s)"
                 abort
               end
               batch += 1
